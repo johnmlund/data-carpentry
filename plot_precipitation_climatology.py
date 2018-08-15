@@ -10,7 +10,7 @@ import iris.plot as iplt
 import iris.coord_categorisation
 import cmocean
 
-
+# Random comment
 
 def read_data(fname, month):
     """Read an input data file"""
@@ -30,6 +30,17 @@ def convert_pr_units(cube):
     cube.units = 'mm/day'
     
     return cube
+
+def apply_mask(pr_cube, sftlf_cube, realm):
+    """Mask ocean using a sftlf (land surface fraction) file."""
+   
+    if realm == 'land':
+        mask = numpy.where(sftlf_cube.data > 50, True, False)
+    else:
+        mask = numpy.where(sftlf_cube.data < 50, True, False)
+   
+    pr_cube.data = numpy.ma.asarray(pr_cube.data)
+    pr_cube.data.mask = mask
 
 
 def plot_data(cube, month, gridlines=False):
@@ -56,8 +67,15 @@ def main(inargs):
     cube = read_data(inargs.infile, inargs.month)    
     cube = convert_pr_units(cube)
     clim = cube.collapsed('time', iris.analysis.MEAN)
+    if inargs.mask:
+        sftlf_file, realm = inargs.mask
+        sftlf_cube = iris.load_cube(sftlf_file, 'land_area_fraction')
+        apply_mask(clim, sftlf_cube, realm)
+
     plot_data(clim, inargs.month)
     plt.savefig(inargs.outfile)
+
+    
 
 
 if __name__ == '__main__':
@@ -73,6 +91,14 @@ if __name__ == '__main__':
     #parser.add_argument("month", type=str, help="Month to plot")
     parser.add_argument("outfile", type=str, help="Output file name")
 
+    parser.add_argument("--mask", type=str, nargs=2,
+                    metavar=('SFTLF_FILE', 'REALM'), default=None,
+                    help='Apply a land or ocean mask (specify the realm to mask)')
+
+
     args = parser.parse_args()
+
     
     main(args)
+
+
